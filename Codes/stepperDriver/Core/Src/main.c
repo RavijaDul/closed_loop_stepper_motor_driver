@@ -63,21 +63,28 @@ int main(void)
   uint8_t step = 0;
   while (1)
   {
-	if (enable){
+	if (enable)
+	{
 		readInputs();
 		readEncoderData();  // Read encoder data
 		PI_Controller();  // Compute PI control signal
 
-		if (error > 0) {
-			StepMotor(step);
-			step = (step + 1) % 4; // Increment step for forward direction
-		} else if (error<0) {
-			StepMotor(step);
-			step = (step + 3) % 4; // Decrement step for reverse direction
+
+		if (error>0)
+		{
+		  StepMotor(step);
+		  HAL_Delay((int)(1000 / fabs(control_signal))); // Delay inversely proportional to control signal
+		  step = (step + 1) % 4; // Increment step for forward direction
+		}
+		else if (error<0)
+		{
+		  StepMotor(step);
+		  HAL_Delay((int)(1000 / fabs(control_signal))); // Delay inversely proportional to control signal
+		  step = (step + 3) % 4; // Decrement step for reverse direction
 		}
 	}
 
-   }
+  }
 }
 
 
@@ -103,8 +110,7 @@ void StepMotor(uint8_t step) {
 
 void PI_Controller(void)
 {
-	setpoint = desired_position;
-	error = setpoint - encoder_value;  // Calculate error
+	error = desired_position - encoder_value;  // Calculate error
 
 	integral += error;  // Update integral term
 	if (integral > MAX_INTEGRAL) integral = MAX_INTEGRAL;  // Limit integral term
