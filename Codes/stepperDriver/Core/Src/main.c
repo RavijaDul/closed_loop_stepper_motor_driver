@@ -22,9 +22,12 @@
 #include "stm32f1xx_hal.h"
 
 #define MAX_INTEGRAL 1000.0
+#define MAX_ANGLE 360.0
 
+/* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+SPI_HandleTypeDef hspi1;
 
 volatile float encoder_value = 0.0;  // Encoder value variable
 float setpoint = 1000.0;  // Desired encoder value (adjust as needed)
@@ -37,14 +40,19 @@ int direction;
 int desired_position;
 int enable;
 
+int full_rotations = 0;
+float remaining_degrees = 0.0;
+
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_SPI1_Init(void);
 void PI_Controller(void);
 void readEncoderData(void);
 void readInputs(void);
 void StepMotor(uint8_t);
+void readDesiredPositionSPI(void);
 
 const uint8_t step_sequence[4][4] = {
     {1, 0, 1, 0}, // Step 1: A+ B+
@@ -60,12 +68,14 @@ int main(void)
   SystemClock_Config();
   MX_GPIO_Init();
   MX_I2C1_Init();
+  MX_SPI1_Init();
   uint8_t step = 0;
   while (1)
   {
 	if (enable)
 	{
 		readInputs();
+		readDesiredPositionSPI();  // Read desired position via SPI
 		readEncoderData();  // Read encoder data
 		PI_Controller();  // Compute PI control signal
 
@@ -109,7 +119,34 @@ void StepMotor(uint8_t step) {
 
 void PI_Controller(void)
 {
+	  //Normalize the encoder value within 0 to 360 degrees
+	float normalized_encoder_value = fmod(encoder_value, MAX_ANGLE);
+	if (normalized_encoder_value < 0) normalized_encoder_value += MAX_ANGLE;
+
+	  // Calculate the full rotations for the encoder
+	int encoder_rotations = encoder_value / MAX_ANGLE;
+
+	  // Normalize the desired position within 0 to 360 degrees
+	float normalized_position = fmod(desired_position, MAX_ANGLE);
+	if (normalized_position < 0) normalized_position += MAX_ANGLE;
+
+	  // Calculate the full rotations for the desired position
+	int desired_rotations = desired_position / MAX_ANGLE;
+
+	  // Calculate the total error in terms of rotations and remaining degrees
+	int rotation_error = desired_rotations - encoder_rotations;
+	float degree_error = normalized_position - normalized_encoder_value;
+
+
+	  // Combine the rotation and degree errors
+	error = rotation_error * MAX_ANGLE + degree_error;
+
 	error = desired_position - encoder_value;  // Calculate error
+
+	if (direction == GPIO_PIN_RESET)  // Check if direction pin is reset (logic low)
+	  {
+		error = -error;  // Invert error for reverse direction
+	  }
 
 	integral += error;  // Update integral term
 	if (integral > MAX_INTEGRAL) integral = MAX_INTEGRAL;  // Limit integral term
@@ -135,9 +172,22 @@ void readEncoderData(void)
 
 void readInputs()
 {
-	direction = HAL_GPIO_ReadPin(ID_0_GPIO_Port,ID_0_Pin);
-	desired_position = HAL_GPIO_ReadPin(ID_1_GPIO_Port,ID_1_Pin);
-	enable = HAL_GPIO_ReadPin(ID_2_GPIO_Port,ID_2_Pin);
+    direction = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_6); // PA6 for DIR
+    enable = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_15);  // PA15 for Enable
+}
+
+
+void readDesiredPositionSPI(void)
+{
+    uint8_t spi_rx_buffer[2];
+    if (HAL_SPI_Receive(&hspi1, spi_rx_buffer, 2, HAL_MAX_DELAY) == HAL_OK)
+    {
+        desired_position = (spi_rx_buffer[0] << 8) | spi_rx_buffer[1];
+    }
+    else
+    {
+        Error_Handler();
+    }
 }
 
 void SystemClock_Config(void)
@@ -173,6 +223,7 @@ void SystemClock_Config(void)
 }
 
 
+
 static void MX_I2C1_Init(void)
 {
 
@@ -190,9 +241,35 @@ static void MX_I2C1_Init(void)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN I2C1_Init 2 */
 
-  /* USER CODE END I2C1_Init 2 */
+
+}
+
+
+
+static void MX_SPI1_Init(void)
+{
+
+
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES_RXONLY;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
 
 }
 
@@ -217,8 +294,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, D1_Pin|D2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, IN_BM_Pin|IN_BP_Pin|IN_AM_Pin|IN_AP_Pin
-                          |DIR_Pin|PGO_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, IN_BM_Pin|IN_BP_Pin|IN_AM_Pin|IN_AP_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, IN_APB10_Pin|IN_AMB11_Pin|CAN_TX_Pin, GPIO_PIN_RESET);
@@ -235,17 +311,23 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   HAL_GPIO_Init(Temp_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : IN_BM_Pin IN_BP_Pin IN_AM_Pin IN_AP_Pin
-                           DIR_Pin PGO_Pin */
-  GPIO_InitStruct.Pin = IN_BM_Pin|IN_BP_Pin|IN_AM_Pin|IN_AP_Pin
-                          |DIR_Pin|PGO_Pin;
+  /*Configure GPIO pins : IN_BM_Pin IN_BP_Pin IN_AM_Pin IN_AP_Pin */
+  GPIO_InitStruct.Pin = IN_BM_Pin|IN_BP_Pin|IN_AM_Pin|IN_AP_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : BUTTON_1_Pin BUTTON_2_Pin CAN_RX_Pin */
-  GPIO_InitStruct.Pin = BUTTON_1_Pin|BUTTON_2_Pin|CAN_RX_Pin;
+  /*Configure GPIO pins : DIR_Pin ID_0_Pin ID_1_Pin ID_2_Pin
+                           SW_DIO_Pin SW_CLK_Pin Enable_Pin */
+  GPIO_InitStruct.Pin = DIR_Pin|ID_0_Pin|ID_1_Pin|ID_2_Pin
+                          |SW_DIO_Pin|SW_CLK_Pin|Enable_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : BUTTON_1_Pin BUTTON_2_Pin PB5 CAN_RX_Pin */
+  GPIO_InitStruct.Pin = BUTTON_1_Pin|BUTTON_2_Pin|GPIO_PIN_5|CAN_RX_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -257,23 +339,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : ID_0_Pin ID_1_Pin ID_2_Pin SW_DIO_Pin
-                           SW_CLK_Pin */
-  GPIO_InitStruct.Pin = ID_0_Pin|ID_1_Pin|ID_2_Pin|SW_DIO_Pin
-                          |SW_CLK_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : OUT_ENC_Pin */
-  GPIO_InitStruct.Pin = OUT_ENC_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-  HAL_GPIO_Init(OUT_ENC_GPIO_Port, &GPIO_InitStruct);
-
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
+/* USER CODE BEGIN 4 */
+
+/* USER CODE END 4 */
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */

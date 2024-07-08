@@ -96,10 +96,8 @@ void Error_Handler(void);
 #define SW_DIO_GPIO_Port GPIOA
 #define SW_CLK_Pin GPIO_PIN_14
 #define SW_CLK_GPIO_Port GPIOA
-#define PGO_Pin GPIO_PIN_15
-#define PGO_GPIO_Port GPIOA
-#define OUT_ENC_Pin GPIO_PIN_3
-#define OUT_ENC_GPIO_Port GPIOB
+#define Enable_Pin GPIO_PIN_15
+#define Enable_GPIO_Port GPIOA
 #define CAN_RX_Pin GPIO_PIN_8
 #define CAN_RX_GPIO_Port GPIOB
 #define CAN_TX_Pin GPIO_PIN_9
