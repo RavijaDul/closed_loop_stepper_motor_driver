@@ -88,7 +88,6 @@ int main(void)
 }
 
 
-
 void SetHBridge1Pins(uint8_t in1, uint8_t in2) {
     HAL_GPIO_WritePin(IN_AM_GPIO_Port, IN_AP_Pin, in1);
     HAL_GPIO_WritePin(IN_AM_GPIO_Port, IN_AM_Pin, in2);
