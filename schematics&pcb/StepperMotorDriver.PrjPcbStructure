@@ -1,0 +1,6 @@
+Record=TopLevelDocument|FileName=Main.SchDoc|SheetNumber=1
+Record=SheetSymbol|SourceDocument=Main.SchDoc|Designator=DR1|SchDesignator=DR1|FileName=Drive.SchDoc|SheetNumber=2|SymbolType=Normal|RawFileName=Drive.SchDoc|DesignItemId= |SourceLibraryName= |ObjectKind=Sheet Symbol|RevisionGUID= |ItemGUID= |VaultGUID= 
+Record=SheetSymbol|SourceDocument=Main.SchDoc|Designator=EN1|SchDesignator=EN1|FileName=Interface.SchDoc|SheetNumber=3|SymbolType=Normal|RawFileName=Interface.SchDoc|DesignItemId= |SourceLibraryName= |ObjectKind=Sheet Symbol|RevisionGUID= |ItemGUID= |VaultGUID= 
+Record=SheetSymbol|SourceDocument=Main.SchDoc|Designator=MCU1|SchDesignator=MCU1|FileName=MCU.SchDoc|SheetNumber=4|SymbolType=Normal|RawFileName=MCU.SchDoc|DesignItemId= |SourceLibraryName= |ObjectKind=Sheet Symbol|RevisionGUID= |ItemGUID= |VaultGUID= 
+Record=SheetSymbol|SourceDocument=Main.SchDoc|Designator=PRT1|SchDesignator=PRT1|FileName=Port.SchDoc|SheetNumber=5|SymbolType=Normal|RawFileName=Port.SchDoc|DesignItemId= |SourceLibraryName= |ObjectKind=Sheet Symbol|RevisionGUID= |ItemGUID= |VaultGUID= 
+Record=SheetSymbol|SourceDocument=Main.SchDoc|Designator=PW1|SchDesignator=PW1|FileName=Power.SchDoc|SheetNumber=6|SymbolType=Normal|RawFileName=Power.SchDoc|DesignItemId= |SourceLibraryName= |ObjectKind=Sheet Symbol|RevisionGUID= |ItemGUID= |VaultGUID= 
